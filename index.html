@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cat</title>
+    <link rel="icon" type="image/x-icon" href="./cat.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="main-container">
+        <button id="left-btn" class="arrow">&lt;</button>
+        <img id="main-image" alt="Image">
+        <button id="right-btn" class="arrow">&gt;</button>
+    </div>
+    <div id="button-container">
+        <button id="video-pip-btn">Video-Style PiP</button>
+        <button id="html-pip-btn">HTML Element PiP</button>
+    </div>
+    <div id="html-pip-content" class="pip-container" style="display: none;">
+        <img id="html-pip-image" alt="Image" width="100%">
+    </div>
+    <canvas id="canvas" width="1000" height="1000" style="display:none;"></canvas>
+    <script>
+        const IMAGES = [
+            "https://raw.githubusercontent.com/T3M1N4L/image-pip-js/refs/heads/main/cat.png",
+            "https://raw.githubusercontent.com/T3M1N4L/image-pip-js/refs/heads/main/cat.gif",
+            "https://raw.githubusercontent.com/T3M1N4L/image-pip-js/refs/heads/main/Cool.jpeg",
+            "https://raw.githubusercontent.com/T3M1N4L/image-pip-js/refs/heads/main/%F0%9F%98%8E.jpeg"
+        ];
+        let currentImageIndex = 0;
+
+        const mainImage = document.getElementById("main-image");
+        const htmlPipImage = document.getElementById("html-pip-image");
+        const htmlPipContent = document.getElementById("html-pip-content");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        let videoElement = null; 
+        let pipActive = false;
+        let htmlPipWindow = null;
+
+        function updateImage() {
+            const IMAGE_SRC = IMAGES[currentImageIndex];
+            mainImage.src = IMAGE_SRC;
+            htmlPipImage.src = IMAGE_SRC;
+        }
+
+        async function enterVideoPiP() {
+            try {
+                const IMAGE_SRC = IMAGES[currentImageIndex];
+
+                if (IMAGE_SRC.endsWith(".gif")) {
+                    if (!videoElement) {
+                        videoElement = document.createElement("video");
+                        videoElement.crossOrigin = "anonymous";
+                        videoElement.loop = true;
+                        videoElement.muted = true;
+                    }
+
+                    videoElement.src = IMAGE_SRC;
+                    await videoElement.play(); 
+
+                    if (!document.pictureInPictureElement) {
+                        await videoElement.requestPictureInPicture(); 
+                    } else {
+                        await document.exitPictureInPicture();
+                    }
+                } else {
+
+                    const image = new Image();
+                    image.src = IMAGE_SRC;
+                    image.crossOrigin = "anonymous";
+                    image.onload = () => {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                        if (!document.pictureInPictureElement) {
+                            const stream = canvas.captureStream();
+                            const video = document.createElement("video");
+                            video.srcObject = stream;
+                            video.muted = true;
+                            video.playsInline = true;
+
+                            video.onloadedmetadata = async () => {
+                                await video.play();
+                                await video.requestPictureInPicture();
+                            };
+                        }
+                    };
+                }
+            } catch (error) {
+                console.error("Error with Video PiP:", error);
+            }
+        }
+
+        async function enterHtmlPiP() {
+            try {
+                const pipOptions = {
+                    initialAspectRatio: 1,
+                    lockAspectRatio: false,
+                };
+                htmlPipWindow = await documentPictureInPicture.requestWindow(pipOptions);
+                htmlPipContent.style.display = "flex";
+                htmlPipWindow.document.body.style.margin = "0";
+                htmlPipWindow.document.body.style.padding = "0";
+                htmlPipWindow.document.body.style.backgroundColor = "transparent";
+                htmlPipWindow.document.body.style.overflow = "hidden";
+                htmlPipWindow.document.body.append(htmlPipContent);
+                htmlPipWindow.addEventListener("unload", () => {
+                    document.body.append(htmlPipContent);
+                    htmlPipContent.style.display = "none";
+                    htmlPipWindow = null;
+                }, { once: true });
+            } catch (error) {
+                console.error("Error with HTML PiP:", error);
+            }
+        }
+
+        document.getElementById("left-btn").addEventListener("click", () => {
+            currentImageIndex = (currentImageIndex - 1 + IMAGES.length) % IMAGES.length;
+            updateImage();
+        });
+
+        document.getElementById("right-btn").addEventListener("click", () => {
+            currentImageIndex = (currentImageIndex + 1) % IMAGES.length;
+            updateImage();
+        });
+
+        document.getElementById("video-pip-btn").addEventListener("click", () => enterVideoPiP());
+        document.getElementById("html-pip-btn").addEventListener("click", () => enterHtmlPiP());
+
+        updateImage();
+    </script>
+</body>
+</html>
